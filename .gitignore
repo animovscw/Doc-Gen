@@ -1,0 +1,24 @@
+# Default ignored files
+/shelf/
+/.idea/workspace.xml
+# Ignored default folder with query files
+/queries/
+# Datasource local storage ignored files
+/dataSources/
+/dataSources.local.xml
+# Editor-based HTTP Client requests
+/httpRequests/
+
+# Maven build output
+target/
+*.jar
+
+# Generated docs (re-generate with CLI)
+docs-output/
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
