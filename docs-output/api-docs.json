@@ -1,0 +1,192 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Doc-Gen Demo API",
+    "version": "1.0.0",
+    "description": "Compact reference spec covering all supported cases: GET/POST/PUT/DELETE/PATCH, path/query/header params, request bodies, nested DTOs, enums, arrays, maps, and pagination."
+  },
+  "servers": [
+    { "url": "http://localhost:8080" }
+  ],
+  "paths": {
+    "/api/products": {
+      "get": {
+        "operationId": "getProducts",
+        "summary": "List products with filtering and pagination",
+        "tags": ["Product"],
+        "parameters": [
+          { "name": "name", "in": "query", "required": false, "schema": { "type": "string" }, "description": "Filter by name substring" },
+          { "name": "status", "in": "query", "required": false, "schema": { "$ref": "#/components/schemas/ProductStatus" } },
+          { "name": "page", "in": "query", "required": true, "schema": { "type": "integer", "format": "int32" } },
+          { "name": "size", "in": "query", "required": true, "schema": { "type": "integer", "format": "int32" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Paginated list of products",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/PaginatedProductResponse" }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createProduct",
+        "summary": "Create a new product",
+        "tags": ["Product"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Created",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+          }
+        }
+      }
+    },
+    "/api/products/{id}": {
+      "get": {
+        "operationId": "getProductById",
+        "summary": "Get a single product by ID",
+        "tags": ["Product"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+          }
+        }
+      },
+      "put": {
+        "operationId": "updateProduct",
+        "summary": "Replace a product entirely",
+        "tags": ["Product"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Updated",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+          }
+        }
+      },
+      "delete": {
+        "operationId": "deleteProduct",
+        "summary": "Delete a product",
+        "tags": ["Product"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } }
+        ],
+        "responses": {
+          "204": { "description": "No Content" }
+        }
+      }
+    },
+    "/api/products/{id}/stock": {
+      "patch": {
+        "operationId": "updateStock",
+        "summary": "Adjust product stock quantity",
+        "tags": ["Product"],
+        "parameters": [
+          { "name": "id", "in": "path", "required": true, "schema": { "type": "integer", "format": "int64" } },
+          { "name": "quantity", "in": "query", "required": true, "schema": { "type": "integer", "format": "int32" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Product" } } }
+          }
+        }
+      }
+    },
+    "/api/categories": {
+      "get": {
+        "operationId": "getAllCategories",
+        "summary": "List all categories",
+        "tags": ["Category"],
+        "parameters": [
+          { "name": "X-Tenant-Id", "in": "header", "required": false, "schema": { "type": "string" }, "description": "Optional tenant header" }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": { "type": "array", "items": { "$ref": "#/components/schemas/Category" } }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "operationId": "createCategory",
+        "summary": "Create a category",
+        "tags": ["Category"],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/Category" } } }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "ProductStatus": {
+        "type": "string",
+        "enum": ["ACTIVE", "INACTIVE", "OUT_OF_STOCK", "DISCONTINUED"]
+      },
+      "Category": {
+        "type": "object",
+        "properties": {
+          "id":          { "type": "integer", "format": "int64" },
+          "name":        { "type": "string" },
+          "description": { "type": "string" }
+        }
+      },
+      "Product": {
+        "type": "object",
+        "properties": {
+          "id":          { "type": "integer", "format": "int64" },
+          "name":        { "type": "string" },
+          "description": { "type": "string" },
+          "price":       { "type": "number", "format": "double" },
+          "stock":       { "type": "integer", "format": "int32" },
+          "category":    { "$ref": "#/components/schemas/Category" },
+          "tags":        { "type": "array", "items": { "type": "string" } },
+          "attributes":  { "type": "object", "additionalProperties": { "type": "string" } },
+          "status":      { "$ref": "#/components/schemas/ProductStatus" },
+          "createdAt":   { "type": "string", "format": "date-time" },
+          "updatedAt":   { "type": "string", "format": "date-time" }
+        }
+      },
+      "PaginatedProductResponse": {
+        "type": "object",
+        "properties": {
+          "content":       { "type": "array", "items": { "$ref": "#/components/schemas/Product" } },
+          "page":          { "type": "integer", "format": "int32" },
+          "size":          { "type": "integer", "format": "int32" },
+          "totalElements": { "type": "integer", "format": "int64" },
+          "totalPages":    { "type": "integer", "format": "int32" },
+          "last":          { "type": "boolean" }
+        }
+      }
+    }
+  }
+}
+
