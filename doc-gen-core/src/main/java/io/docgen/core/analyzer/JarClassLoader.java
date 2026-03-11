@@ -9,11 +9,6 @@ import java.util.List;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
-/**
- * Opens a JAR file and loads all classes from it into a child URLClassLoader.
- * The parent ClassLoader provides Spring / Jakarta / Jackson types so that
- * annotation metadata can be inspected via reflection.
- */
 public class JarClassLoader implements AutoCloseable {
 
     private final URLClassLoader classLoader;
@@ -21,8 +16,6 @@ public class JarClassLoader implements AutoCloseable {
 
     public JarClassLoader(File jar) throws Exception {
         this.jarFile = new JarFile(jar);
-        // Use thread context classloader as parent so that annotation classes
-        // from the CLI fat JAR are visible when resolving annotations via reflection.
         ClassLoader parent = Thread.currentThread().getContextClassLoader();
         if (parent == null) parent = JarClassLoader.class.getClassLoader();
         this.classLoader = new URLClassLoader(
@@ -31,10 +24,6 @@ public class JarClassLoader implements AutoCloseable {
         );
     }
 
-    /**
-     * Returns all classes found in the JAR (excluding inner anonymous classes that
-     * cannot be loaded by simple name mapping).
-     */
     public List<Class<?>> loadAllClasses() {
         List<Class<?>> classes = new ArrayList<>();
         Enumeration<JarEntry> entries = jarFile.entries();
@@ -47,7 +36,6 @@ public class JarClassLoader implements AutoCloseable {
                     Class<?> cls = classLoader.loadClass(className);
                     classes.add(cls);
                 } catch (Throwable t) {
-                    // Skip unloadable classes (e.g. missing transitive deps)
                     System.err.println("[WARN] Could not load class: " + className + " — " + t.getMessage());
                 }
             }

@@ -7,10 +7,6 @@ import java.lang.reflect.Method;
 import java.lang.reflect.Parameter;
 import java.util.*;
 
-/**
- * Scans a list of classes for Spring @Controller / @RestController annotated classes
- * and extracts endpoint metadata via reflection.
- */
 public class ControllerScanner {
 
     private static final Set<String> CONTROLLER_ANNOTATIONS = Set.of(
@@ -35,15 +31,6 @@ public class ControllerScanner {
         this.typeResolver = new TypeResolver(schemaRegistry);
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-    // -------------------------------------------------------------------------
-
-    /**
-     * Scans all provided classes, filtering controllers and building path items.
-     *
-     * @return map of path → PathItem containing all discovered operations
-     */
     public Map<String, PathItem> scan(List<Class<?>> classes) {
         Map<String, PathItem> paths = new LinkedHashMap<>();
 
@@ -55,12 +42,8 @@ public class ControllerScanner {
         return paths;
     }
 
-    // -------------------------------------------------------------------------
-    // Controller scanning
-    // -------------------------------------------------------------------------
 
     private void scanController(Class<?> cls, Map<String, PathItem> paths) {
-        // Class-level base path(s)
         List<String> classPaths = extractPaths(cls.getAnnotations());
         if (classPaths.isEmpty()) classPaths = List.of("");
 
@@ -105,9 +88,6 @@ public class ControllerScanner {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Operation building
-    // -------------------------------------------------------------------------
 
     private Operation buildOperation(Method method, String tag) {
         Operation op = new Operation();
@@ -115,7 +95,6 @@ public class ControllerScanner {
         op.setSummary(humanize(method.getName()));
         op.setTags(List.of(tag));
 
-        // Parameters
         List<io.docgen.core.model.Parameter> params = new ArrayList<>();
         for (Parameter param : method.getParameters()) {
             io.docgen.core.model.Parameter p = buildParameter(param, method);
@@ -123,22 +102,18 @@ public class ControllerScanner {
         }
         if (!params.isEmpty()) op.setParameters(params);
 
-        // Request body
         RequestBody requestBody = buildRequestBody(method);
         if (requestBody != null) op.setRequestBody(requestBody);
 
-        // Responses
         op.setResponses(buildResponses(method));
 
         return op;
     }
 
     private io.docgen.core.model.Parameter buildParameter(Parameter param, Method method) {
-        // Check skip types
         String typeName = param.getType().getSimpleName();
         if (SKIP_PARAMETER_TYPES.contains(typeName)) return null;
 
-        // @RequestBody → handled separately
         if (hasAnnotation(param, "RequestBody")) return null;
 
         io.docgen.core.model.Parameter p = new io.docgen.core.model.Parameter();
@@ -156,11 +131,9 @@ public class ControllerScanner {
             p.setRequired(isAnnotationRequired(param, "RequestHeader"));
             p.setName(getAnnotationValue(param, "RequestHeader", param.getName()));
         } else {
-            // Unannotated parameter — skip (Spring MVC wouldn't bind it anyway)
             return null;
         }
 
-        // Schema from type
         Schema schema = typeResolver.resolve(param.getParameterizedType());
         if (schema != null) p.setSchema(schema);
 
@@ -208,15 +181,11 @@ public class ControllerScanner {
         return responses;
     }
 
-    // -------------------------------------------------------------------------
-    // Annotation helpers
-    // -------------------------------------------------------------------------
 
     private boolean isController(Class<?> cls) {
         for (Annotation ann : cls.getAnnotations()) {
             String name = ann.annotationType().getSimpleName();
             if (CONTROLLER_ANNOTATIONS.contains(name)) return true;
-            // Check meta-annotations (e.g., @RestController is itself @Controller)
             for (Annotation metaAnn : ann.annotationType().getAnnotations()) {
                 if (CONTROLLER_ANNOTATIONS.contains(metaAnn.annotationType().getSimpleName())) return true;
             }
@@ -253,7 +222,7 @@ public class ControllerScanner {
                     Object[] methods = (Object[]) ann.annotationType()
                             .getMethod("method").invoke(ann);
                     if (methods == null || methods.length == 0) {
-                        yield List.of("GET"); // default
+                        yield List.of("GET");
                     }
                     List<String> result = new ArrayList<>();
                     for (Object m : methods) result.add(m.toString());
@@ -310,14 +279,11 @@ public class ControllerScanner {
             if (ann.annotationType().getSimpleName().equals("ResponseStatus")) {
                 try {
                     Object code = ann.annotationType().getMethod("value").invoke(ann);
-                    // HttpStatus enum toString gives something like "CREATED"
-                    // We need the numeric value
                     Object numeric = code.getClass().getMethod("value").invoke(code);
                     return String.valueOf(numeric);
                 } catch (Exception ignored) {}
             }
         }
-        // Convention: void/Void returns → 204 No Content
         Class<?> returnType = method.getReturnType();
         if (returnType == void.class || returnType == Void.class) return "204";
         return "200";
@@ -326,13 +292,11 @@ public class ControllerScanner {
     private String normalizePath(String path) {
         if (path.isEmpty()) return "/";
         if (!path.startsWith("/")) path = "/" + path;
-        // Collapse multiple slashes
         path = path.replaceAll("//+", "/");
         return path;
     }
 
     private String humanize(String methodName) {
-        // camelCase → "Camel Case"
         return methodName
                 .replaceAll("([A-Z])", " $1")
                 .trim()
