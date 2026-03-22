@@ -1,6 +1,8 @@
 package io.docgen.core.analyzer;
 
 import io.docgen.core.model.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.lang.annotation.Annotation;
 import java.lang.reflect.Method;
@@ -8,6 +10,8 @@ import java.lang.reflect.Parameter;
 import java.util.*;
 
 public class ControllerScanner {
+
+    private static final Logger logger = LoggerFactory.getLogger(ControllerScanner.class);
 
     private static final Set<String> CONTROLLER_ANNOTATIONS = Set.of(
             "Controller", "RestController"
@@ -25,10 +29,16 @@ public class ControllerScanner {
 
     private final Map<String, Schema> schemaRegistry;
     private final TypeResolver typeResolver;
+    private final JavadocResolver javadocResolver;
 
     public ControllerScanner(Map<String, Schema> schemaRegistry) {
+        this(schemaRegistry, null);
+    }
+
+    public ControllerScanner(Map<String, Schema> schemaRegistry, JavadocResolver javadocResolver) {
         this.schemaRegistry = schemaRegistry;
         this.typeResolver = new TypeResolver(schemaRegistry);
+        this.javadocResolver = javadocResolver;
     }
 
     public Map<String, PathItem> scan(List<Class<?>> classes) {
@@ -72,7 +82,7 @@ public class ControllerScanner {
             try {
                 op = buildOperation(method, tag);
             } catch (Throwable t) {
-                System.err.println("[WARN] Skipping method " + method.getName() + ": " + t.getMessage());
+                logger.warn("Skipping method {}: {}", method.getName(), t.getMessage());
                 continue;
             }
 

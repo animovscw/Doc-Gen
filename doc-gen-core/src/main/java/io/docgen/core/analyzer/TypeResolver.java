@@ -40,7 +40,7 @@ public class TypeResolver {
 
         if (type instanceof WildcardType wt) {
             Type[] upper = wt.getUpperBounds();
-            return (upper != null && upper.length > 0) ? doResolve(upper[0]) : Schema.ofType("object");
+            return (upper.length > 0) ? doResolve(upper[0]) : Schema.ofType("object");
         }
 
         if (type instanceof TypeVariable<?>) {
@@ -174,6 +174,12 @@ public class TypeResolver {
 
         if (!props.isEmpty()) {
             dto.setProperties(props);
+            
+            // Detect required fields using validation annotations
+            List<String> required = RequiredFieldDetector.detectRequiredFields(cls);
+            if (!required.isEmpty()) {
+                dto.setRequired(required);
+            }
         }
 
         inProgress.remove(name);
