@@ -2,12 +2,16 @@ package io.docgen.core.generator;
 
 import io.docgen.core.model.ApiSpec;
 import io.docgen.core.serializer.JsonSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 
 public class HtmlGenerator {
+
+    private static final Logger logger = LoggerFactory.getLogger(HtmlGenerator.class);
 
     private final JsonSerializer jsonSerializer = new JsonSerializer();
 
@@ -36,11 +40,12 @@ public class HtmlGenerator {
     private String loadResource(String path) {
         try (InputStream is = getClass().getResourceAsStream(path)) {
             if (is == null) {
-                System.err.println("[WARN] Resource not found: " + path);
+                logger.warn("Resource not found: {}", path);
                 return "/* resource " + path + " not found */";
             }
             return new String(is.readAllBytes(), StandardCharsets.UTF_8);
         } catch (IOException e) {
+            logger.error("Failed to read resource: {}", path, e);
             throw new RuntimeException("Failed to read resource: " + path, e);
         }
     }

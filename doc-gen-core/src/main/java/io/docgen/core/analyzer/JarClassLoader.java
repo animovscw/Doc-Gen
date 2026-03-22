@@ -1,5 +1,8 @@
 package io.docgen.core.analyzer;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.io.File;
 import java.net.URL;
 import java.net.URLClassLoader;
@@ -10,6 +13,8 @@ import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
 
 public class JarClassLoader implements AutoCloseable {
+
+    private static final Logger logger = LoggerFactory.getLogger(JarClassLoader.class);
 
     private final URLClassLoader classLoader;
     private final JarFile jarFile;
@@ -36,7 +41,7 @@ public class JarClassLoader implements AutoCloseable {
                     Class<?> cls = classLoader.loadClass(className);
                     classes.add(cls);
                 } catch (Throwable t) {
-                    System.err.println("[WARN] Could not load class: " + className + " — " + t.getMessage());
+                    logger.debug("Could not load class: {} — {}", className, t.getMessage());
                 }
             }
         }
