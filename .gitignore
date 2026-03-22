@@ -22,3 +22,7 @@ docs-output/
 .classpath
 .project
 .settings/
+
+# Logs
+logs/
+*.log
