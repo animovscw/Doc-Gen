@@ -1,10 +1,13 @@
 package io.docgen.cli;
 
 import io.docgen.core.analyzer.ApiSpecBuilder;
+import io.docgen.core.analyzer.JavadocResolver;
 import io.docgen.core.analyzer.JarClassLoader;
 import io.docgen.core.generator.HtmlGenerator;
 import io.docgen.core.model.ApiSpec;
 import io.docgen.core.serializer.JsonSerializer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import picocli.CommandLine;
 import picocli.CommandLine.Command;
 import picocli.CommandLine.Option;
@@ -24,6 +27,8 @@ import java.util.concurrent.Callable;
 )
 public class DocGenCommand implements Callable<Integer> {
 
+    private static final Logger logger = LoggerFactory.getLogger(DocGenCommand.class);
+
     @Parameters(index = "0", description = "Path to the JAR file containing Spring controllers.")
     private File inputJar;
 
@@ -42,33 +47,42 @@ public class DocGenCommand implements Callable<Integer> {
     @Option(names = {"--description"}, description = "API description.")
     private String description;
 
+    @Option(names = {"--with-javadoc"}, description = "Extract descriptions from JavaDoc comments.", defaultValue = "false")
+    private boolean withJavadoc;
+
     @Override
     public Integer call() throws Exception {
         if (!inputJar.exists() || !inputJar.isFile()) {
-            System.err.println("ERROR: JAR file not found: " + inputJar.getAbsolutePath());
+            logger.error("JAR file not found: {}", inputJar.getAbsolutePath());
             return 1;
         }
 
-        System.out.println("Doc-Gen: Scanning " + inputJar.getName() + " ...");
+        logger.info("Doc-Gen: Scanning {} ...", inputJar.getName());
 
         List<Class<?>> classes;
+        JavadocResolver javadocResolver = null;
         try (JarClassLoader loader = new JarClassLoader(inputJar)) {
             classes = loader.loadAllClasses();
+            if (withJavadoc) {
+                javadocResolver = new JavadocResolver(inputJar);
+                logger.debug("JavaDoc resolver initialized");
+            }
         }
-        System.out.println("  Found " + classes.size() + " classes.");
+        logger.info("  Found {} classes.", classes.size());
 
         ApiSpecBuilder builder = new ApiSpecBuilder()
                 .title(title)
                 .version(apiVersion);
         if (serverUrl != null) builder.serverUrl(serverUrl);
         if (description != null) builder.description(description);
+        if (javadocResolver != null) builder.javadocResolver(javadocResolver);
 
         ApiSpec spec = builder.build(classes);
 
         int endpointCount = spec.getPaths() != null ? spec.getPaths().size() : 0;
         int schemaCount = (spec.getComponents() != null && spec.getComponents().getSchemas() != null)
                 ? spec.getComponents().getSchemas().size() : 0;
-        System.out.println("  Discovered " + endpointCount + " path(s), " + schemaCount + " schema(s).");
+        logger.info("  Discovered {} path(s), {} schema(s).", endpointCount, schemaCount);
 
         Path outPath = outputDir.toPath();
         Files.createDirectories(outPath);
@@ -76,14 +90,18 @@ public class DocGenCommand implements Callable<Integer> {
         JsonSerializer serializer = new JsonSerializer();
         String json = serializer.serialize(spec);
         Files.writeString(outPath.resolve("api-docs.json"), json);
-        System.out.println("  Written: " + outPath.resolve("api-docs.json"));
+        logger.info("  Written: {}", outPath.resolve("api-docs.json"));
 
         HtmlGenerator htmlGenerator = new HtmlGenerator();
         String html = htmlGenerator.generate(spec);
         Files.writeString(outPath.resolve("index.html"), html);
-        System.out.println("  Written: " + outPath.resolve("index.html"));
+        logger.info("  Written: {}", outPath.resolve("index.html"));
 
-        System.out.println("Done!");
+        if (javadocResolver != null) {
+            javadocResolver.close();
+        }
+
+        logger.info("Done!");
         return 0;
     }
 
