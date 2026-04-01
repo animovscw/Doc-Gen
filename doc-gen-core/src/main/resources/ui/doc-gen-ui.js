@@ -7,6 +7,7 @@
     return;
   }
 
+  let globalBaseUrl = '';
 
   function el(tag, attrs, ...children) {
     const node = document.createElement(tag);
@@ -101,14 +102,15 @@
     return null;
   }
 
-  function buildSampleBody(schema, visited) {
-    var info = spec.info || {};
-    var server = (spec.servers && spec.servers[0] && spec.servers[0].url) || '';
-    return el('header', { 'id': 'dg-header' },
-      el('h1', {}, info.title || 'API Documentation'),
-      el('span', { 'class': 'dg-version' }, 'v' + (info.version || '1.0')),
-      el('span', { 'class': 'dg-server' }, server)
-    );
+  function methodClass(method) {
+    const classes = {
+      'get': 'dg-method-GET',
+      'post': 'dg-method-POST',
+      'put': 'dg-method-PUT',
+      'delete': 'dg-method-DELETE',
+      'patch': 'dg-method-PATCH'
+    };
+    return classes[method.toLowerCase()] || 'dg-method-default';
   }
 
   function renderEndpoint(path, method, operation) {
@@ -219,13 +221,8 @@
       return el('div', { 'class': 'dg-try-row' }, el('label', {}, label), input);
     }
 
-    var baseInput = el('input', { type: 'text', value: (spec.servers && spec.servers[0] && spec.servers[0].url) || '' });
-    box.appendChild(el('div', { 'class': 'dg-try-row' }, el('label', {}, 'Base URL'), baseInput));
-
     pathParams.forEach(function(p) { box.appendChild(addRow('{' + p.name + '}', p.name)); });
-
     queryParams.forEach(function(p) { box.appendChild(addRow(p.name + ' (query)', p.name)); });
-
     headerParams.forEach(function(p) { box.appendChild(addRow(p.name + ' (header)', p.name)); });
 
     var bodyInput = null;
@@ -244,9 +241,10 @@
 
     execBtn.addEventListener('click', function() {
       responseBox.innerHTML = '';
-      var baseUrl = baseInput.value.replace(/\/$/, '');
 
+      var baseUrl = globalBaseUrl.replace(/\/$/, '');
       var url = path;
+
       pathParams.forEach(function(p) {
         var val = inputMap[p.name] ? inputMap[p.name].value : '';
         url = url.replace('{' + p.name + '}', encodeURIComponent(val));
@@ -269,7 +267,12 @@
         if (val) headers[p.name] = val;
       });
 
-      var fetchOpts = { method: method.toUpperCase(), headers: headers };
+      var fetchOpts = {
+        method: method.toUpperCase(),
+        headers: headers,
+        mode: 'cors'
+      };
+
       if (bodyInput && bodyInput.value.trim()) {
         fetchOpts.body = bodyInput.value;
       }
@@ -279,29 +282,80 @@
       responseBox.appendChild(statusDiv);
       responseBox.appendChild(bodyPre);
 
-      fetch(fullUrl, fetchOpts).then(function(resp) {
-        return resp.text().then(function(text) {
-          statusDiv.textContent = 'HTTP ' + resp.status + ' ' + resp.statusText;
-          statusDiv.className = 'dg-response-status ' + (resp.ok ? 'ok' : 'err');
-          var pretty = text;
-          try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
-          bodyPre.textContent = pretty;
+      fetch(fullUrl, fetchOpts)
+        .then(function(resp) {
+          return resp.text().then(function(text) {
+            statusDiv.textContent = 'HTTP ' + resp.status + ' ' + resp.statusText;
+            statusDiv.className = 'dg-response-status ' + (resp.ok ? 'ok' : 'err');
+            var pretty = text;
+            try { pretty = JSON.stringify(JSON.parse(text), null, 2); } catch(e) {}
+            bodyPre.textContent = pretty;
+          });
+        })
+        .catch(function(err) {
+          statusDiv.textContent = 'Network Error: ' + err.message;
+          statusDiv.className = 'dg-response-status err';
+          bodyPre.textContent = 'Failed to fetch. Check CORS or server availability.\n\n' + err.message;
         });
-      }).catch(function(err) {
-        statusDiv.textContent = 'Network Error';
-        statusDiv.className = 'dg-response-status err';
-        bodyPre.textContent = err.message;
-      });
     });
 
-    return obj;
+    return box;
+  }
+
+  function renderGlobalControls() {
+    var defaultUrl = (spec.servers && spec.servers[0] && spec.servers[0].url) || 'http://localhost:8080';
+    globalBaseUrl = defaultUrl;
+
+    var container = el('div', {
+      'class': 'dg-global-controls',
+      'style': 'background: #fff; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,.08); margin-bottom: 2rem; padding: 1rem;'
+    });
+
+    var title = el('div', {
+      'class': 'dg-section-title',
+      'style': 'margin-bottom: 0.75rem;'
+    }, '🌐 Server Configuration');
+
+    var row = el('div', { 'class': 'dg-try-row', 'style': 'margin-bottom: 0;' },
+      el('label', { 'style': 'min-width: 80px;' }, 'Base URL:'),
+      el('input', {
+        type: 'text',
+        value: defaultUrl,
+        style: 'flex: 1; padding: 0.5rem; border: 1px solid #cbd5e0; border-radius: 5px; font-size: 0.9rem;',
+        oninput: function(e) {
+          globalBaseUrl = e.target.value;
+        }
+      })
+    );
+
+    var hint = el('div', {
+      'style': 'font-size: 0.75rem; color: #718096; margin-top: 0.5rem;'
+    }, 'This URL will be used for all API requests');
+
+    container.appendChild(title);
+    container.appendChild(row);
+    container.appendChild(hint);
+
+    return container;
   }
 
   function renderHeader() {
+    var info = spec.info || {};
+    var server = (spec.servers && spec.servers[0] && spec.servers[0].url) || '';
+    return el('header', { 'id': 'dg-header' },
+      el('h1', {}, info.title || 'API Documentation'),
+      el('span', { 'class': 'dg-version' }, 'v' + (info.version || '1.0')),
+      el('span', { 'class': 'dg-server' }, server)
+    );
+  }
+
+  function render() {
     var app = document.getElementById('app');
     app.appendChild(renderHeader());
 
     var main = el('div', { id: 'dg-main' });
+
+    main.appendChild(renderGlobalControls());
 
     var byTag = {};
     if (spec.paths) {
@@ -337,6 +391,4 @@
   }
 
   document.addEventListener('DOMContentLoaded', render);
-
 })();
-

@@ -8,6 +8,7 @@ import java.util.HashMap;
 
 @RestController
 @RequestMapping("/api/v1/products")
+@CrossOrigin(origins = "*")
 public class ProductController {
 
     public ProductController() {}
